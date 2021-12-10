@@ -1,0 +1,277 @@
+<template>
+    <div id="app" class="web-camera-container">
+        <div class="camera-button">
+            <button type="button" class="button is-rounded" :class="{ 'is-primary' : !isCameraOpen, 'is-danger' : isCameraOpen}" @click="toggleCamera">
+                <span v-if="!isCameraOpen">Open Camera</span>
+                <span v-else>Close Camera</span>
+            </button>
+        </div>
+        
+        <div v-show="isCameraOpen && isLoading" class="camera-loading">
+            <ul class="loader-circle">
+            <li></li>
+            <li></li>
+            <li></li>
+            </ul>
+        </div>
+        
+        <div v-if="isCameraOpen" v-show="!isLoading" class="camera-box" :class="{ 'flash' : isShotPhoto }">
+            
+            <div class="camera-shutter" :class="{'flash' : isShotPhoto}"></div>
+            
+            <video v-show="!isPhotoTaken" ref="camera" :width="450" :height="337.5" autoplay></video>
+            
+            <canvas v-show="isPhotoTaken" id="photoTaken" ref="canvas" :width="450" :height="337.5"></canvas>
+        </div>
+        
+        <div v-if="isCameraOpen && !isLoading" class="camera-shoot">
+            <button type="button" class="button" @click="takePhoto">
+            <img src="https://img.icons8.com/material-outlined/50/000000/camera--v2.png">
+            </button>
+        </div>
+        
+        <div v-if="isPhotoTaken && isCameraOpen && result !== ''" class="camera-download">
+            <a id="detectPhoto" class="button" role="button" @click="detectObjImage">
+            Detect Photo
+            </a>
+        </div>
+    </div>
+</template>
+
+<script>
+import HelloWorld from "@/components/HelloWorld.vue";
+import Component from "vue-class-component";
+import Vue from "vue";
+import nvision from "@nipacloud/nvision";
+
+
+    export default({
+        name: "nuttasart",
+        components: {
+            HelloWorld
+        },
+        data() {
+            return {
+            result: "",
+            isCameraOpen: false,
+            isPhotoTaken: false,
+            isShotPhoto: false,
+            isLoading: false,
+            link: '#'
+            }
+        },
+        
+        methods: {
+            toggleCamera() {
+            if(this.isCameraOpen) {
+                this.isCameraOpen = false;
+                this.isPhotoTaken = false;
+                this.isShotPhoto = false;
+                this.stopCameraStream();
+            } else {
+                this.isCameraOpen = true;
+                this.createCameraElement();
+            }
+            },
+            
+            createCameraElement() {
+            this.isLoading = true;
+            
+            const constraints = (window.constraints = {
+                        audio: false,
+                        video: true
+                    });
+
+
+                    navigator.mediaDevices
+                        .getUserMedia(constraints)
+                        .then(stream => {
+                this.isLoading = false;
+                            this.$refs.camera.srcObject = stream;
+                        })
+                        .catch(error => {
+                this.isLoading = false;
+                            alert("May the browser didn't support or there is some errors.");
+                        });
+            },
+            
+            stopCameraStream() {
+            let tracks = this.$refs.camera.srcObject.getTracks();
+
+                    tracks.forEach(track => {
+                        track.stop();
+                    });
+            },
+            
+            takePhoto() {
+            if(!this.isPhotoTaken) {
+                this.isShotPhoto = true;
+
+                const FLASH_TIMEOUT = 50;
+
+                setTimeout(() => {
+                this.isShotPhoto = false;
+                }, FLASH_TIMEOUT);
+            }
+            
+            this.isPhotoTaken = !this.isPhotoTaken;
+            
+            const context = this.$refs.canvas.getContext('2d');
+            context.drawImage(this.$refs.camera, 0, 0, 450, 337.5);
+            const canvas = document.getElementById("photoTaken").toDataURL("image/jpeg")
+            .replace("image/jpeg", "image/octet-stream");
+            this.objectDetectionService = nvision.objectDetection({
+                apiKey:     "cdb29f355cb4059995e05420dc8d963f657898bf3a5f2f5e7a88c58279f5e4a0a1c4c4cf874594b42e413fc45c425425ac"
+            });
+
+            this.objectDetectionService
+            .predict({
+            rawData: (canvas).replace(/data:.+;base64,/, ""),
+            })
+            .then(
+                    (data) => (
+                        this.result = JSON.stringify(data, null, 4)
+                    )
+                    
+                );
+
+            },
+            detectObjImage() {
+            let obj = JSON.parse(this.result);
+            const ctx = this.$refs.canvas.getContext('2d');
+            const font = "16px sans-serif";
+            obj.detected_objects.forEach(prediction=>{
+                if(prediction.confidence>0.5){
+                    const textWidth = ctx.measureText(prediction.name).width;
+                    alert(textWidth);
+                    const textHeight = parseInt(font, 10);
+                    const x = prediction.bounding_box.left;
+                    const y = prediction.bounding_box.top;
+                    const width =  prediction.bounding_box.right - prediction.bounding_box.left;
+                    const height = prediction.bounding_box.bottom - prediction.bounding_box.top;
+
+                    ctx.strokeStyle = "#00FFFF";
+                    ctx.lineWidth = 2;
+                    ctx.fillStyle = "#00FFFF";
+                    ctx.font = font;
+                    ctx.textBaseline = "top";
+                    ctx.strokeRect(x, y, width, height);
+                    ctx.fillRect(x, y, textWidth + 4, textHeight + 2);
+
+                    ctx.fillStyle = "#000000";
+                    ctx.fillText(prediction.name, x, y);
+                    
+                }
+                
+            })
+            }
+            
+            
+        }
+    });
+</script>
+
+<style scope>
+    body {
+        display: flex;
+        justify-content: center;
+    }
+    .web-camera-container {
+        margin-top: 2rem;
+        margin-bottom: 2rem;
+        padding: 2rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        width: 500px;
+    }
+    .web-camera-container .camera-button {
+        margin-bottom: 2rem;
+    }
+    .web-camera-container .camera-box .camera-shutter {
+        opacity: 0;
+        width: 450px;
+        height: 337.5px;
+        background-color: #fff;
+        position: absolute;
+    }
+    .web-camera-container .camera-box .camera-shutter.flash {
+        opacity: 1;
+    }
+    .web-camera-container .camera-shoot {
+        margin: 1rem 0;
+    }
+    .web-camera-container .camera-shoot button {
+        height: 60px;
+        width: 60px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 100%;
+    }
+    .web-camera-container .camera-shoot button img {
+        height: 35px;
+        object-fit: cover;
+    }
+    .web-camera-container .camera-loading {
+        overflow: hidden;
+        height: 100%;
+        position: absolute;
+        width: 100%;
+        min-height: 150px;
+        margin: 3rem 0 0 -1.2rem;
+    }
+    .web-camera-container .camera-loading ul {
+        height: 100%;
+        position: absolute;
+        width: 100%;
+        z-index: 999999;
+        margin: 0;
+    }
+    .web-camera-container .camera-loading .loader-circle {
+        display: block;
+        height: 14px;
+        margin: 0 auto;
+        top: 50%;
+        left: 100%;
+        transform: translateY(-50%);
+        transform: translateX(-50%);
+        position: absolute;
+        width: 100%;
+        padding: 0;
+    }
+    .web-camera-container .camera-loading .loader-circle li {
+        display: block;
+        float: left;
+        width: 10px;
+        height: 10px;
+        line-height: 10px;
+        padding: 0;
+        position: relative;
+        margin: 0 0 0 4px;
+        background: #999;
+        animation: preload 1s infinite;
+        top: -50%;
+        border-radius: 100%;
+    }
+    .web-camera-container .camera-loading .loader-circle li:nth-child(2) {
+        animation-delay: 0.2s;
+    }
+    .web-camera-container .camera-loading .loader-circle li:nth-child(3) {
+        animation-delay: 0.4s;
+    }
+    @keyframes preload {
+        0% {
+            opacity: 1;
+        }
+        50% {
+            opacity: 0.4;
+        }
+        100% {
+            opacity: 1;
+        }
+    }
+</style>
