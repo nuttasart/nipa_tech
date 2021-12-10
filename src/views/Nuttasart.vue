@@ -40,11 +40,7 @@
 
 <script>
 import HelloWorld from "@/components/HelloWorld.vue";
-import Component from "vue-class-component";
-import Vue from "vue";
 import nvision from "@nipacloud/nvision";
-
-
     export default({
         name: "nuttasart",
         components: {
