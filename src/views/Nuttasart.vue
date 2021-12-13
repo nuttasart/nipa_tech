@@ -139,7 +139,7 @@ import nvision from "@nipacloud/nvision";
             obj.detected_objects.forEach(prediction=>{
                 if(prediction.confidence>0.5){
                     const textWidth = ctx.measureText(prediction.name).width;
-                    alert(textWidth);
+                    //alert(textWidth);
                     const textHeight = parseInt(font, 10);
                     const x = prediction.bounding_box.left;
                     const y = prediction.bounding_box.top;
@@ -271,3 +271,6 @@ import nvision from "@nipacloud/nvision";
         }
     }
 </style>
+
+
+
